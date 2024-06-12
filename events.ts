@@ -2,24 +2,29 @@ import { InlineKeyboard } from "https://deno.land/x/grammy@v1.23.0/mod.ts";
 import { bot, socialLayerClient } from "./constants.ts";
 import { formatEvent } from "./format.ts";
 import { markdownv2 as format } from "https://deno.land/x/telegram_format@v3.1.0/mod.ts";
+import { parseDate } from "./client.ts";
 
-export async function sendEvents(
+export async function sendEventsRaw(
   groupIds: number[],
   offset: number,
   lastLoadMoreMessageId: number | undefined,
   chatId: number,
   is_topic_message: boolean,
   message_thread_id: number | undefined,
+  startISO: string,
+  endISO: string,
 ): Promise<
   {
     offset: number;
     lastLoadMoreMessageId: number | undefined;
   } | void
 > {
-  const limit = 20;
+  const limit = 10;
   let newOffset = offset;
-  const { events, hasNextPage } = await socialLayerClient.getTodaysEvents(
+  const { events, hasNextPage } = await socialLayerClient.getEventsRaw(
     groupIds,
+    startISO,
+    endISO,
     limit,
     offset,
   );
@@ -36,9 +41,13 @@ export async function sendEvents(
     } fantastic events spread across ${spots.size} lively spots. Dive in and enjoy!`
     : "";
 
+  const groupInfos = await socialLayerClient.getGroupInfos(groupIds);
+  const info = groupInfos.at(0);
+
   const appPromotionMessage = "Check out app.sola.day... to see more!";
 
-  if (hasEvents) {
+  if (hasEvents && info) {
+    const groupUrl = `https://${info.username}.sola.day`;
     console.debug(
       `${lastLoadMoreMessageId || "undefined lastLoadMoreMessageId"}`,
     );
@@ -52,12 +61,16 @@ export async function sendEvents(
     }
 
     newOffset += events.length;
-    const formattedEvents = events.map(formatEvent).map((msg) => msg.caption)
+    const formattedEvents = events.map((event) =>
+      formatEvent(event, info.username)
+    ).map((msg) => msg.caption)
       .join("\n\n");
 
     const messageToSend = `${
       introMessage.length != 0
-        ? format.bold(format.escape(`${introMessage}\n\n`))
+        ? `${format.bold(format.escape(`${introMessage}\n`))}${
+          format.underline(format.escape(`${groupUrl}\n\n`))
+        }`
         : ""
     }${formattedEvents}${
       !hasNextPage
@@ -66,6 +79,8 @@ export async function sendEvents(
         )
         : ""
     }`;
+
+    console.debug(`${messageToSend}`);
 
     await bot.api.sendMessage(chatId, messageToSend, {
       parse_mode: "MarkdownV2",
@@ -100,4 +115,71 @@ export async function sendEvents(
       },
     );
   }
+}
+
+export async function sendEvents(
+  groupIds: number[],
+  offset: number,
+  lastLoadMoreMessageId: number | undefined,
+  chatId: number,
+  is_topic_message: boolean,
+  message_thread_id: number | undefined,
+  startDateInput: string,
+  days: number,
+): Promise<
+  {
+    offset: number;
+    lastLoadMoreMessageId: number | undefined;
+  } | void
+> {
+  const groupInfo = await socialLayerClient.getGroupTimestamp(groupIds);
+  const timezone = groupInfo.length === 0 ? "Asia/Shanghai" : groupInfo[0];
+
+  // Parse date inputs
+  const startDate = parseDate(startDateInput, timezone);
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + days);
+
+  const startISO = startDate.toISOString();
+  const endISO = endDate.toISOString();
+
+  const res = await sendEventsRaw(
+    groupIds,
+    offset,
+    lastLoadMoreMessageId,
+    chatId,
+    is_topic_message,
+    message_thread_id,
+    startISO,
+    endISO,
+  );
+
+  return res;
+}
+
+export async function sendTodayEvents(
+  groupIds: number[],
+  offset: number,
+  lastLoadMoreMessageId: number | undefined,
+  chatId: number,
+  is_topic_message: boolean,
+  message_thread_id: number | undefined,
+  days: number,
+): Promise<
+  {
+    offset: number;
+    lastLoadMoreMessageId: number | undefined;
+  } | void
+> {
+  const res = await sendEvents(
+    groupIds,
+    offset,
+    lastLoadMoreMessageId,
+    chatId,
+    is_topic_message,
+    message_thread_id,
+    "today",
+    days,
+  );
+  return res;
 }

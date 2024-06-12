@@ -8,7 +8,7 @@ import {
 } from "./types.ts";
 import { markdownv2 as format } from "https://deno.land/x/telegram_format@v3.1.0/mod.ts";
 
-export function formatEvent(event: Event): EventMessage {
+export function formatEvent(event: Event, groupName: string): EventMessage {
   const {
     title,
     start_time,
@@ -17,6 +17,7 @@ export function formatEvent(event: Event): EventMessage {
     meeting_url,
     host_info,
     timezone,
+    id,
   } = event;
 
   const formattedTitle = format.bold(format.escape(title));
@@ -31,6 +32,7 @@ export function formatEvent(event: Event): EventMessage {
 
   const hostInfo = parseHostInfo(host_info);
   const formattedHostInfo = formatHostInfo(hostInfo);
+  const eventDetail = `https://${groupName}.sola.day/event/detail/${id}`;
 
   const caption = [
     `${formattedTitle}`,
@@ -42,6 +44,7 @@ export function formatEvent(event: Event): EventMessage {
       ? `${format.bold("Meeting URL:")} ${format.escape(formattedMeetingUrl)}`
       : "",
     formattedHostInfo,
+    `${format.escape(eventDetail)}`,
   ].filter((line) => line.trim()).join("\n");
 
   return {
@@ -103,26 +106,33 @@ function formatHostInfo(hostInfo: HostInfo | null): string {
     return "";
   }
 
-  const allHosts = [];
+  const formattedHosts = [];
 
-  if (hostInfo.speaker && Array.isArray(hostInfo.speaker)) {
-    allHosts.push(...hostInfo.speaker.map((speaker) => speaker.username));
+  if (hostInfo.group_host?.nickname) {
+    formattedHosts.push(
+      `${format.bold("Host:")} ${format.escape(hostInfo.group_host.nickname)}`,
+    );
   }
 
-  if (hostInfo.co_host && Array.isArray(hostInfo.co_host)) {
-    allHosts.push(...hostInfo.co_host.map((coHost) => coHost.username));
+  if (Array.isArray(hostInfo.co_host) && hostInfo.co_host.length > 0) {
+    const coHosts = hostInfo.co_host.map((coHost) =>
+      format.escape(coHost.username)
+    ).join(", ");
+    formattedHosts.push(
+      `${format.bold(format.escape("Co-hosts:"))} ${format.escape(coHosts)}`,
+    );
   }
 
-  if (hostInfo.group_host && hostInfo.group_host.username) {
-    const groupHostUsername = `${hostInfo.group_host.username}${
-      hostInfo.group_host.creator ? " (Creator)" : ""
-    }`;
-    allHosts.push(groupHostUsername);
+  if (Array.isArray(hostInfo.speaker) && hostInfo.speaker.length > 0) {
+    const speakers = hostInfo.speaker.map((speaker) =>
+      format.escape(speaker.username)
+    ).join(", ");
+    formattedHosts.push(
+      `${format.bold("Speakers:")} ${format.escape(speakers)}`,
+    );
   }
 
-  return allHosts.length > 0
-    ? `${format.bold("Hosts:")} ${format.escape(allHosts.join(", "))}`
-    : "";
+  return formattedHosts.length > 0 ? `${formattedHosts.join("\n")}` : "";
 }
 
 export function getGroupIdCounts(groupIds: number[]): Map<number, number> {
