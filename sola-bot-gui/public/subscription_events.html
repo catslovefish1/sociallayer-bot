@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group Photos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .group-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .group-container a {
+            text-decoration: none;
+            color: black;
+        }
+        .group-container img {
+            width: 100%;
+            height: auto;
+            border-radius: 10px;
+        }
+        .group-container span {
+            display: block;
+            text-align: center;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Group Photos</h1>
+    <div class="group-container" id="groups"></div>
+
+    <script>
+        async function fetchGroups() {
+            const response = await fetch('/api/groups');
+            const groups = await response.json();
+            const container = document.getElementById('groups');
+            groups.forEach(group => {
+                const groupElement = document.createElement('a');
+                groupElement.href = `https://app.sola.day/event/${group.username}`;
+                groupElement.target = '_blank';
+                groupElement.innerHTML = `
+                    <img src="${group.image_url}" alt="${group.username}">
+                    <span>${group.username}</span>
+                `;
+                container.appendChild(groupElement);
+            });
+        }
+        fetchGroups();
+    </script>
+</body>
+</html>
+

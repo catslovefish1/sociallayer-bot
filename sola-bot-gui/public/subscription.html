@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscribe Here </title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .group-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .group-container a {
+            text-decoration: none;
+            color: black;
+        }
+        .group-container img {
+            width: 100%;
+            height: auto;
+            border-radius: 10px;
+        }
+        .group-container span {
+            display: block;
+            text-align: center;
+            margin-top: 5px;
+        }
+        .group-container button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <h1>Subscribe Here </h1>
+    <div class="group-container" id="groups"></div>
+
+    <script>
+        Telegram.WebApp.ready();
+
+        async function fetchGroups() {
+            const response = await fetch('/api/groups');
+            const groups = await response.json();
+            const container = document.getElementById('groups');
+            groups.forEach(group => {
+                const groupElement = document.createElement('div');
+                groupElement.innerHTML = `
+                    <a href="https://app.sola.day/event/${group.username}" target="_blank">
+                        <img src="${group.image_url}" alt="${group.username}">
+                        <span>${group.username}</span>
+                    </a>
+                    <button onclick="subscribe(${group.id}, '${group.username}')">Subscribe to ${group.username}</button>
+                `;
+                container.appendChild(groupElement);
+            });
+        }
+
+        async function subscribe(groupId, groupName) {
+            const chatId = Telegram.WebApp.initDataUnsafe.user.id;
+            const response = await fetch('/subscribe', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ chatId, groupId, groupName }),
+            });
+            const result = await response.json();
+            alert(result.message);
+        }
+
+        fetchGroups();
+    </script>
+</body>
+</html>
